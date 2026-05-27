@@ -1,0 +1,9 @@
+{
+  "name": "peek",
+  "version": "0.1.0",
+  "description": "Read-only repository inspector. Inspect git state, folder structure, and file contents through a /peek subagent that can never modify the repo or filesystem.",
+  "author": {
+    "name": "Steven Chang"
+  },
+  "keywords": ["git", "read-only", "inspector", "subagent", "diff", "review"]
+}
