@@ -1,0 +1,13 @@
+{
+  "name": "peek-marketplace",
+  "owner": {
+    "name": "Steven Chang"
+  },
+  "plugins": [
+    {
+      "name": "peek",
+      "source": "./plugins/peek",
+      "description": "Read-only repo inspector: inspect git state, folder structure, and file contents via /peek, with a subagent that can never mutate the repo."
+    }
+  ]
+}
