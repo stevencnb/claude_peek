@@ -111,6 +111,19 @@ run peek-inspector "timeout 5 rm x" deny
 run peek-inspector "nohup rm x" deny
 run peek-inspector "nice -n 10 rm x" deny
 
+echo "---- inside inspector: write-capable options on read subcommands must DENY ----"
+run peek-inspector "git diff --output=/tmp/x" deny
+run peek-inspector "git diff --output /tmp/x" deny
+run peek-inspector "git show --output=/tmp/x HEAD" deny
+run peek-inspector "git log --output=/tmp/x -1" deny
+run peek-inspector "git format-patch --output-directory /tmp HEAD~1" deny
+run peek-inspector "git diff --output-indicator-new=x" allow
+
+echo "---- inside inspector: control chars / quotes must not break emitted JSON ----"
+TAB=$(printf '\t')
+run peek-inspector "rm${TAB}x" deny
+run peek-inspector 'rm "a b"' deny
+
 echo "---- inside inspector: ASK (grey zone) ----"
 run peek-inspector "psql -c whatever" ask
 run peek-inspector "git branch newbranch" ask

@@ -40,7 +40,7 @@ ability to edit, commit, and run commands is **never affected**.
 Inside the inspector, each Bash command is classified three ways:
 
 - **deny** — destructive / mutating / escape commands: `rm`, `mv`, `git commit`/`push`/
-  `checkout`/`reset`/…, output redirection (`>`/`>>`), command substitution (`` ` `` /
+  `checkout`/`reset`/…, output redirection (`>`/`>>`, `git --output`), command substitution (`` ` `` /
   `$(...)`), interpreters (`python -c`, `bash -c`, `awk`, …), `sudo`, etc. Blocked.
 - **allow** — recognized read-only inspection commands: `git status`/`log`/`diff`/`show`,
   read-only `git branch`/`remote -v`/`config --get`, `ls`/`tree`/`cat`/`head`/`tail`/

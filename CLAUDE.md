@@ -40,7 +40,7 @@ Everything serves one goal: inspection that **cannot** mutate, while leaving the
 **The linchpin — `agent_type` scoping.** `hooks/hooks.json` registers `scripts/peek-guard.sh` as a *session-wide* PreToolUse hook on `Bash`. But the guard's **first action** is a jq-free check: if the hook payload's `agent_type` is not `"peek-inspector"` (the subagent's frontmatter `name`), it `exit 0`s with no output. `agent_type` is absent on the main thread and other agents, so the guard **no-ops everywhere except inside the inspector** — normal editing/committing/running is never touched. This single fact connects `hooks.json` ↔ `peek-guard.sh` ↔ `agents/peek-inspector.md`; understand it before touching any of them.
 
 **Three-way guard, fails closed (only inside the inspector).** Each Bash command is classified:
-- **deny** — output redirection / command & process substitution (checked on the whole string, even inside quotes); known mutators/interpreters/privilege programs (the `MUT_PROGS`/`PRIV_PROGS` tables); git *write* subcommands; `find` with `-delete`/`-exec`.
+- **deny** — output redirection / command & process substitution (checked on the whole string, even inside quotes); known mutators/interpreters/privilege programs (the `MUT_PROGS`/`PRIV_PROGS` tables); git *write* subcommands and git `--output`/`--output-directory` (a file write available even on read subcommands like `diff`/`show`/`log`); `find` with `-delete`/`-exec`.
 - **allow** — recognized read-only programs (`RO_PROGS`) and git *read* subcommands.
 - **ask** — anything unrecognized or ambiguous → defers to the user's own permission config / an interactive prompt.
 

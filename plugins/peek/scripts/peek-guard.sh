@@ -41,7 +41,10 @@ fi
 # emit DECISION REASON  — print a PreToolUse decision and exit.
 # ---------------------------------------------------------------------------
 emit() {
-  reason=$(printf '%s' "$2" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr -d '\n\r')
+  # Escape backslash/quote, then neutralize ALL control chars (tab, newline, CR, …)
+  # to spaces so the embedded command can never produce invalid JSON (which could
+  # drop a deny decision and fail open).
+  reason=$(printf '%s' "$2" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr '\000-\037' ' ')
   printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"%s","permissionDecisionReason":"%s"}}\n' "$1" "$reason"
   exit 0
 }
@@ -167,6 +170,13 @@ classify_git() {
   case " $* " in
     *" -c "*|*" --exec-path"*|*" --upload-pack"*|*" --receive-pack"*)
       seg_dec="deny"; seg_reason="git -c/--exec-path overrides are not allowed"; return ;;
+  esac
+  # --output/--output-directory write a file (redirection by another name); any
+  # subcommand that accepts them (diff/show/log/format-patch/…) could clobber a path.
+  # Matched as whole tokens so read-only flags like --output-indicator-new are unaffected.
+  case " $* " in
+    *" --output "*|*" --output="*|*" --output-directory "*|*" --output-directory="*)
+      seg_dec="deny"; seg_reason="git --output writes to a file and is not read-only"; return ;;
   esac
   # skip benign global options to reach the subcommand
   while [ "$#" -gt 0 ]; do
