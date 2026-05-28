@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2086
+#   ^ This guard deliberately relies on word-splitting (with `set -f` disabling globbing,
+#     below) to tokenize commands and scan the space-separated PROG/ENV tables; unquoted
+#     $vars are intentional throughout, so SC2086 ("double quote to prevent splitting")
+#     is expected file-wide and would break the logic if "fixed".
 #
 # peek-guard.sh — PreToolUse Bash guard for the `peek-inspector` subagent.
 #
@@ -69,6 +74,7 @@ esac
 case "$cmd" in
   *'`'*)  emit deny "Command substitution (backticks) is blocked in the read-only inspector." ;;
 esac
+# shellcheck disable=SC2016  # the literal '$(' is the match target, not an expansion
 case "$cmd" in
   *'$('*) emit deny "Command substitution \$(...) is blocked in the read-only inspector." ;;
 esac
@@ -85,6 +91,9 @@ RO_PROGS="ls tree cat head tail wc stat file pwd echo which basename dirname rea
 MUT_PROGS="rm rmdir mv cp ln dd tee truncate shred chmod chown chgrp install rsync mkfifo mknod sed gsed awk gawk nawk perl python python2 python3 ruby node deno bun php lua Rscript sh bash zsh ksh dash fish csh tcsh eval exec source apt apt-get yum dnf brew port pacman npm pnpm yarn pip pip3 pipx gem cargo go make cmake gcc cc clang curl wget scp sftp ssh nc ncat telnet kill pkill killall mount umount systemctl service launchctl crontab git-receive-pack patch tar unzip zip gzip gunzip bzip2 xz touch mkdir"
 # Privilege escalation -> deny.
 PRIV_PROGS="sudo doas su runas pkexec"
+# Environment overrides that can turn a read command into code execution / library
+# injection (git runs PAGER/EXTERNAL_DIFF/SSH/EDITOR via the shell; loaders honor LD_*/DYLD_*).
+DANGER_ENV="GIT_PAGER PAGER GIT_EXTERNAL_DIFF GIT_DIFF_OPTS GIT_SSH GIT_SSH_COMMAND GIT_PROXY_COMMAND GIT_ASKPASS SSH_ASKPASS GIT_EDITOR GIT_SEQUENCE_EDITOR EDITOR VISUAL GIT_CONFIG GIT_CONFIG_GLOBAL GIT_CONFIG_SYSTEM LESSOPEN LESSCLOSE LD_PRELOAD LD_LIBRARY_PATH LD_AUDIT DYLD_INSERT_LIBRARIES DYLD_LIBRARY_PATH DYLD_FRAMEWORK_PATH BASH_ENV ENV SHELL IFS PATH PROMPT_COMMAND"
 
 is_word_in() {  # $1=needle, rest=haystack words; 0 if found
   needle="$1"; shift
@@ -122,11 +131,22 @@ classify_git_dual() {
         *) seg_dec="deny"; seg_reason="git remote $1 modifies remotes"; return ;;
       esac ;;
     config)
+      # explicit read flags -> allow
       case " $gargs " in
         *" --get "*|*" --get-all "*|*" --get-regexp "*|*" --get-urlmatch "*|*" --get-color "*|*" --get-colorbool "*|*" --list "*|*" -l "*)
           seg_dec="allow"; return ;;
-        *) seg_dec="ask"; seg_reason="git config without --get/--list may set a value"; return ;;
-      esac ;;
+      esac
+      # write flags modify config even with a single key arg -> deny
+      case " $gargs " in
+        *" --add "*|*" --unset "*|*" --unset-all "*|*" --replace-all "*|*" --remove-section "*|*" --rename-section "*|*" --edit "*|*" -e "*)
+          seg_dec="deny"; seg_reason="git config write flag modifies config"; return ;;
+      esac
+      # a single bare key with no value is a read (e.g. `git config user.email`);
+      # `git config key value` (>=2 non-option args) is a set -> ask (user decides)
+      n=0
+      for a in $gargs; do case "$a" in -*) ;; *) n=$((n+1)) ;; esac; done
+      if [ "$n" -eq 1 ]; then seg_dec="allow"; return; fi
+      seg_dec="ask"; seg_reason="git config without --get/--list may set a value"; return ;;
     stash)
       set -- $gargs
       if [ "$#" -eq 0 ]; then seg_dec="deny"; seg_reason="bare 'git stash' saves a stash"; return; fi
@@ -207,10 +227,15 @@ classify_git() {
 classify() {
   s="$1"
   set -- $s
-  # skip leading VAR=val environment assignments
+  # skip leading VAR=val environment assignments; deny ones that can alter execution
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      [A-Za-z_]*=*) shift ;;
+      [A-Za-z_]*=*)
+        env_var="${1%%=*}"
+        if is_word_in "$env_var" $DANGER_ENV; then
+          seg_dec="deny"; seg_reason="environment override '$env_var' can change how commands execute"; return
+        fi
+        shift ;;
       *) break ;;
     esac
   done
@@ -229,8 +254,9 @@ classify() {
     classify_git "$@"; return
   fi
   if [ "$prog" = "find" ]; then
+    # -exec also covers -execdir, and -ok covers -okdir (matched here as prefixes).
     case " $s " in
-      *" -delete"*|*" -exec"*|*" -execdir"*|*" -ok"*|*" -okdir"*|*" -fprintf"*|*" -fprint "*|*" -fprint0"*|*" -fls"*)
+      *" -delete"*|*" -exec"*|*" -ok"*|*" -fprintf"*|*" -fprint "*|*" -fprint0"*|*" -fls"*)
         seg_dec="deny"; seg_reason="find with -delete/-exec writes or executes"; return ;;
     esac
     seg_dec="allow"; return
@@ -257,6 +283,7 @@ classify() {
 # 3b) Split on shell separators ( ; | & and thus && || |& ) plus newlines,
 #     then classify every segment. deny wins over ask wins over allow.
 # ---------------------------------------------------------------------------
+# shellcheck disable=SC2020  # mapping each of ; | & to a newline; tr interprets \n, three given for portability
 segments="$(printf '%s' "$cmd" | tr ';|&' '\n\n\n')"
 
 overall="allow"

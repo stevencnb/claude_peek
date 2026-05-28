@@ -91,6 +91,7 @@ run peek-inspector "echo hi > /tmp/x" deny
 run peek-inspector "cat a >> b" deny
 run peek-inspector "ls && rm x" deny
 run peek-inspector "ls; rm x" deny
+# shellcheck disable=SC2016  # literal $(...) is the test input; it must NOT expand here
 run peek-inspector 'echo $(rm x)' deny
 run peek-inspector "cat ${BT}ls${BT}" deny
 run peek-inspector "find . -name '*.js' -delete" deny
@@ -124,10 +125,29 @@ TAB=$(printf '\t')
 run peek-inspector "rm${TAB}x" deny
 run peek-inspector 'rm "a b"' deny
 
+echo "---- inside inspector: dangerous env overrides must DENY ----"
+run peek-inspector "GIT_PAGER=evil git -p log" deny
+run peek-inspector "GIT_EXTERNAL_DIFF=evil git diff" deny
+run peek-inspector "LD_PRELOAD=/tmp/x.so ls" deny
+run peek-inspector "PATH=/tmp git status" deny
+run peek-inspector "FOO=1 git status" allow
+run peek-inspector "TZ=UTC git log -1" allow
+
+echo "---- inside inspector: find exec/ok variants must DENY ----"
+run peek-inspector "find . -execdir rm {} ;" deny
+run peek-inspector "find . -ok rm {} ;" deny
+run peek-inspector "find . -okdir rm {} ;" deny
+
+echo "---- inside inspector: git config reads allow, writes deny ----"
+run peek-inspector "git config user.email" allow
+run peek-inspector "git config --global user.name" allow
+run peek-inspector "git config --unset user.name" deny
+run peek-inspector "git config --add core.x y" deny
+run peek-inspector "git config user.email newval" ask
+
 echo "---- inside inspector: ASK (grey zone) ----"
 run peek-inspector "psql -c whatever" ask
 run peek-inspector "git branch newbranch" ask
-run peek-inspector "git config user.name" ask
 run peek-inspector "some-unknown-tool --flag" ask
 run peek-inspector "git frobnicate" ask
 run peek-inspector "docker ps" ask
