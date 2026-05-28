@@ -79,4 +79,5 @@ To actually mutate the repo through `peek`, an attacker would need one of:
 ## See also
 
 - [architecture.md](architecture.md) — how the guard is built.
+- [design-principles.md](design-principles.md) — the design philosophy in four questions.
 - [Design spec](superpowers/specs/2026-05-27-peek-plugin-design.md) — decision record.

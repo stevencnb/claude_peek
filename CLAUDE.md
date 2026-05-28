@@ -65,3 +65,5 @@ Compound commands are split on `; | &` and newlines and **every** segment is cla
 ## Deeper context
 
 `docs/superpowers/specs/2026-05-27-peek-plugin-design.md` is the canonical design doc: the verified Claude Code platform facts (hook `agent_type`, the decision JSON, deny→ask→allow precedence) and the rationale for the three-way model. Read it before changing the safety model.
+
+`docs/design-principles.md` distills the *why* into four questions (where temporary inspection work lives; which promises are enforced vs. instructed; which decisions belong to the plugin vs. the user's environment; how to fail when a piece is missing). It's the living philosophy layer above the dated spec — keep it in sync when the safety model's rationale changes.

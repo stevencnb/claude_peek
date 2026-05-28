@@ -102,6 +102,7 @@ main agent ──(Agent tool, subagent_type: peek-inspector)──▶ peek-inspe
 
 ## See also
 
+- [design-principles.md](design-principles.md) — the four design questions behind these mechanisms.
 - [security.md](security.md) — the threat model and the full deny list.
 - [remote-sessions.md](remote-sessions.md) — why `peek` exists for remote sessions.
 - [Design spec](superpowers/specs/2026-05-27-peek-plugin-design.md) — decision record.

@@ -12,6 +12,7 @@ your main session's context**.
 
 - **Want to use it?** → [use-cases.md](use-cases.md)
 - **Want to understand it?** → [architecture.md](architecture.md)
+- **Want the "why" behind the design?** → [design-principles.md](design-principles.md)
 - **Evaluating whether to install?** → [security.md](security.md)
 - **On a remote/web session without `!`?** → [remote-sessions.md](remote-sessions.md)
 
