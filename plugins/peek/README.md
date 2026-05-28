@@ -16,6 +16,9 @@ few commits, a diff, the folder layout, a file's contents — without derailing 
 thread or risking an accidental write. `peek` runs that inspection in an isolated
 subagent and returns the raw output.
 
+If you're on a remote session where `! <cmd>` shell mode is disabled, this is the
+in-session replacement — see [docs/remote-sessions.md](../../docs/remote-sessions.md).
+
 ## Usage
 
 ```
@@ -32,26 +35,14 @@ The inspector returns command output verbatim. It never edits, advises, or mutat
 
 ## Safety model (read-only is enforced, not trusted)
 
-`peek` ships a `PreToolUse` hook (`scripts/peek-guard.sh`) that runs on every Bash call
-but **acts only inside the `peek-inspector` subagent** — it keys on the hook's
-`agent_type` field. In your main session (and any other agent) it no-ops, so your normal
-ability to edit, commit, and run commands is **never affected**.
+A `PreToolUse` Bash hook (`scripts/peek-guard.sh`) acts **only inside the
+`peek-inspector` subagent** (it keys on `agent_type`) and **no-ops in your main
+session**. Inside the inspector it classifies every command **deny / allow / ask**
+(deny beats ask beats allow) and hard-blocks the deny floor with `exit 2`. The
+subagent also has `Write`/`Edit` disabled as a coarse tool-level boundary.
 
-Inside the inspector, each Bash command is classified three ways:
-
-- **deny** — destructive / mutating / escape commands: `rm`, `mv`, `git commit`/`push`/
-  `checkout`/`reset`/…, output redirection (`>`/`>>`, `git --output`), command substitution (`` ` `` /
-  `$(...)`), interpreters (`python -c`, `bash -c`, `awk`, …), `sudo`, etc. Blocked.
-- **allow** — recognized read-only inspection commands: `git status`/`log`/`diff`/`show`,
-  read-only `git branch`/`remote -v`/`config --get`, `ls`/`tree`/`cat`/`head`/`tail`/
-  `wc`/`stat`, `find` (without `-delete`/`-exec`), `grep`, etc. Run with no prompt.
-- **ask** — anything else (unrecognized program, or an ambiguous form). The command is
-  surfaced for a permission decision, so **your** Claude Code config (allow/ask/deny
-  rules) or an interactive prompt decides. Deny rules always win.
-
-The subagent additionally has `Write`/`Edit` disabled at the tool level as a coarse hard
-boundary. The guard fails **closed** inside the inspector: anything it can't confidently
-classify as read-only is denied or escalated, never silently allowed.
+→ **Full threat model: [docs/security.md](../../docs/security.md). How it works:
+[docs/architecture.md](../../docs/architecture.md).**
 
 ## Requirements
 

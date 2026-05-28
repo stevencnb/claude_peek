@@ -25,3 +25,6 @@ mkdir -p ~/.claude/commands && cp standalone/peek.md ~/.claude/commands/peek.md
 Use the **plugin** when you want the hard, enforced read-only guarantee and context
 isolation. Use the **standalone** when you want the simplest possible bare `/peek` and are
 fine relying on your own Claude Code permission configuration for the read-only boundary.
+
+Most [use-cases](../docs/use-cases.md) apply to both versions; for the plugin-vs-standalone
+trade-off in depth see [docs/architecture.md](../docs/architecture.md#plugin-vs-standalone).
