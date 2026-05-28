@@ -58,7 +58,7 @@ Compound commands are split on `; | &` and newlines and **every** segment is cla
 
 - **Target bash 3.2** (macOS default): no associative arrays, no `${var,,}`; use `case` / `grep -E`.
 - **Fail closed inside, open outside.** The `agent_type` scope gate must stay first and jq-free, so a guard error or a missing `jq` can never affect the main session. Inside the inspector, uncertainty resolves to `ask`/`deny`, never a silent allow.
-- **The deny floor uses `permissionDecision: deny`.** A non-blocking non-zero exit fails *open* — never use it as a deny path. (Residual assumption, spec §11: if `deny` is ever found not to hold under `bypassPermissions`, switch the deny path to `exit 2`.)
+- **The deny floor uses `exit 2`.** Exit 2 is the documented hard block — it blocks the tool call in *every* permission mode, including `bypassPermissions` (this resolves spec §11). `ask`/`allow` stay as exit-0 JSON decisions, so the user's own config still governs the grey zone. Never use any *other* non-zero exit as a deny path — only `2` blocks; the rest fail *open*.
 - **Never write to `${CLAUDE_PLUGIN_ROOT}`** — it is ephemeral (cleaned ~7 days). No logs or state there.
 - **Keep `tests/test-peek-guard.sh` in sync** — every classification change needs a case; run the suite after editing.
 

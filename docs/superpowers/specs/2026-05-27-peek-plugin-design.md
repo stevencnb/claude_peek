@@ -118,12 +118,11 @@ A single PreToolUse hook on `Bash`, session-wide, but **gated on subagent identi
    This fail-closed only triggers _inside_ the inspector, so it can never break the
    main session.
 3. **Classify the command (fail-closed):**
-   - **DENY** (the hard floor; mechanism = `permissionDecision: deny`). Intended to
-     hold regardless of session permission mode because PreToolUse hooks run before
-     permission evaluation. **Caveat:** docs only _explicitly_ guarantee mode-independent
-     blocking for **exit code 2**; whether `permissionDecision: deny` also holds under
-     `bypassPermissions` must be verified in testing (§11) — if it doesn't, the deny
-     path falls back to `exit 2`.
+   - **DENY** (the hard floor; mechanism = **`exit 2`**). Exit 2 is the documented
+     blocking error and blocks the tool call in every permission mode, including
+     `bypassPermissions`. (Originally `permissionDecision: deny`; switched to `exit 2`
+     on 2026-05-27 — see §11 — because only exit 2 is doc-guaranteed mode-independent.
+     `ask`/`allow` remain exit-0 JSON so the user's config still governs the grey zone.)
      - Output redirection in any form: `>`, `>>`, `2>`, `&>` (denied even if quoted —
        acceptable, since read-only inspection rarely needs a literal `>`).
      - Command/process substitution: `$( … )`, backticks, `<( … )`, `>( … )`.
@@ -259,9 +258,10 @@ out of scope).
 
 - Exact top-level `marketplace.json` field set (`name`, `owner`, `plugins[]` with
   `name`/`source: ./plugins/peek`/`description`) — validate with `claude plugin validate`.
-- **Verify the deny floor under `bypassPermissions`** (and `acceptEdits`): confirm a
-  `permissionDecision: deny` from the guard actually blocks; if not, switch the deny
-  path to `exit 2`. This is the one residual safety assumption.
+- ~~**Verify the deny floor under `bypassPermissions`**~~ — **RESOLVED 2026-05-27.**
+  Rather than rely on `permissionDecision: deny` holding under `bypassPermissions`
+  (not doc-guaranteed), the guard's deny path now uses **`exit 2`**, which docs
+  guarantee blocks the tool call in every mode. `ask`/`allow` stay as exit-0 JSON.
 - Confirm `ask` behavior inside the subagent (prompts the user in the main session in
   `default` mode; should degrade to deny when non-interactive).
 - Whether to commit on `main` or a feature branch (raise with user before any commit).

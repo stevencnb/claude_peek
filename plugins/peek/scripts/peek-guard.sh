@@ -46,10 +46,20 @@ fi
 # emit DECISION REASON  — print a PreToolUse decision and exit.
 # ---------------------------------------------------------------------------
 emit() {
-  # Escape backslash/quote, then neutralize ALL control chars (tab, newline, CR, …)
-  # to spaces so the embedded command can never produce invalid JSON (which could
-  # drop a deny decision and fail open).
-  reason=$(printf '%s' "$2" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr '\000-\037' ' ')
+  # Neutralize ALL control chars (tab, newline, CR, …) to spaces so neither the stderr
+  # message nor the JSON payload can be mangled by the embedded command string.
+  clean=$(printf '%s' "$2" | tr '\000-\037' ' ')
+  if [ "$1" = "deny" ]; then
+    # The hard floor blocks with exit 2, which is documented to block the tool call in
+    # EVERY permission mode (including bypassPermissions) — unlike permissionDecision:deny,
+    # whose mode-independence is not guaranteed. The reason is surfaced to the model via
+    # stderr. ask/allow stay as exit-0 JSON decisions so the user's own permission config
+    # still governs them. NEVER use any *other* non-zero exit as a deny (those fail open).
+    printf 'peek-inspector blocked a non-read-only command: %s\n' "$clean" >&2
+    exit 2
+  fi
+  # JSON string escaping for the permissionDecision payload (ask / allow only).
+  reason=$(printf '%s' "$clean" | sed 's/\\/\\\\/g; s/"/\\"/g')
   printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"%s","permissionDecisionReason":"%s"}}\n' "$1" "$reason"
   exit 0
 }

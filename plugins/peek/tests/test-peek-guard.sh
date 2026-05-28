@@ -26,9 +26,12 @@ run() {
   else
     json=$(jq -n --arg c "$cmd" --arg a "$at" '{tool_name:"Bash",tool_input:{command:$c},agent_type:$a}')
   fi
-  out=$(printf '%s' "$json" | bash "$GUARD")
-  if [ -z "$out" ]; then got="noop"
-  else got=$(printf '%s' "$out" | jq -r '.hookSpecificOutput.permissionDecision'); fi
+  out=$(printf '%s' "$json" | bash "$GUARD" 2>/dev/null); rc=$?
+  if [ "$rc" -eq 2 ]; then got="deny"            # hard floor: exit 2 blocks the call
+  elif [ -n "$out" ]; then
+    got=$(printf '%s' "$out" | jq -r '.hookSpecificOutput.permissionDecision' 2>/dev/null)
+    [ -z "$got" ] && got="bad-json"
+  else got="noop"; fi                            # exit 0 + no stdout = main-session no-op
   if [ "$got" = "$want" ]; then
     pass=$((pass+1)); printf 'PASS  %-14s want=%-5s  %s\n' "$at" "$want" "$cmd"
   else
@@ -120,10 +123,11 @@ run peek-inspector "git log --output=/tmp/x -1" deny
 run peek-inspector "git format-patch --output-directory /tmp HEAD~1" deny
 run peek-inspector "git diff --output-indicator-new=x" allow
 
-echo "---- inside inspector: control chars / quotes must not break emitted JSON ----"
+echo "---- inside inspector: weird chars don't break deny (exit 2) or ask/allow JSON ----"
 TAB=$(printf '\t')
 run peek-inspector "rm${TAB}x" deny
 run peek-inspector 'rm "a b"' deny
+run peek-inspector 'weird"tool x' ask
 
 echo "---- inside inspector: dangerous env overrides must DENY ----"
 run peek-inspector "GIT_PAGER=evil git -p log" deny
@@ -153,6 +157,24 @@ run peek-inspector "git frobnicate" ask
 run peek-inspector "docker ps" ask
 run peek-inspector "xargs grep foo" ask
 run peek-inspector "nice -n 10 ls" ask
+
+echo "---- deny is a hard block: guard exits 2 (blocks in every permission mode) ----"
+rc_of() {  # exit code of the guard for agent ($1) / command ($2)
+  if [ "$1" = "-" ]; then j=$(jq -n --arg c "$2" '{tool_input:{command:$c}}')
+  else j=$(jq -n --arg c "$2" --arg a "$1" '{tool_input:{command:$c},agent_type:$a}'); fi
+  printf '%s' "$j" | bash "$GUARD" >/dev/null 2>&1; echo "$?"
+}
+check_rc() {
+  got=$(rc_of "$1" "$2")
+  if [ "$got" = "$3" ]; then pass=$((pass+1)); printf 'PASS  exit=%-3s %s\n' "$got" "$2"
+  else fail=$((fail+1)); printf 'FAIL  want-exit=%-3s got-exit=%-3s %s\n' "$3" "$got" "$2"; fails="$fails\n  exit[$1] $2 (want $3 got $got)"; fi
+}
+check_rc peek-inspector "rm file" 2
+check_rc peek-inspector "git commit -m x" 2
+check_rc peek-inspector "cat f > out" 2
+check_rc peek-inspector "git status" 0
+check_rc peek-inspector "docker ps" 0
+check_rc - "rm -rf /" 0
 
 echo ""
 echo "================ RESULT: $pass passed, $fail failed ================"
