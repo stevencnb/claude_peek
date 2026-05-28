@@ -15,19 +15,15 @@ See [`plugins/peek/README.md`](plugins/peek/README.md) for full usage and the sa
 
 ## Install
 
-Add this repo as a plugin marketplace, then install `peek`:
+Add this repo as a plugin marketplace, then install `peek` — from inside Claude Code:
 
 ```
-/plugin marketplace add <this-repo-url-or-local-path>
+/plugin marketplace add stevencnb/claude_peek
 /plugin install peek@peek-marketplace
 ```
 
-From a local clone, for example:
-
-```
-/plugin marketplace add /path/to/claude_peek
-/plugin install peek@peek-marketplace
-```
+(`stevencnb/claude_peek` is the GitHub `owner/repo` shorthand; a full Git URL works too.
+From a local clone, use the path instead: `/plugin marketplace add /path/to/claude_peek`.)
 
 Then try it. Plugin skills are always namespaced as `plugin:command`, so the command is
 `peek:peek`:
@@ -46,6 +42,29 @@ For a bare `/peek` without the plugin, see [`standalone/README.md`](standalone/R
 `jq` must be installed (`brew install jq` on macOS) — the guard uses it to read the
 proposed command. macOS / Linux (bash). See the [plugin README](plugins/peek/README.md)
 for details. (The lightweight `standalone/peek.md` has no `jq` dependency.)
+
+## Development
+
+Hacking on the plugin? Two things to know:
+
+- **`--plugin-dir` loads your live edits** — the fastest loop, no install:
+  ```
+  claude --plugin-dir ./plugins/peek
+  ```
+  It loads straight from your working tree. The command refreshes on `/reload-plugins`,
+  but the `peek-inspector` subagent only re-registers after a full Claude Code restart.
+- **An installed copy does *not* auto-update.** `/plugin install` copies the plugin into a
+  versioned cache pinned to the commit at install time, so later edits to this repo don't
+  reach it. To refresh it, `/plugin uninstall peek@peek-marketplace` then `/plugin install`
+  again (a plain `/plugin update` can skip when `plugin.json`'s version is unchanged).
+
+Run the guard test suite after any change to the safety model:
+
+```
+bash plugins/peek/tests/test-peek-guard.sh
+```
+
+See [`CLAUDE.md`](CLAUDE.md) for the architecture and the guard's invariants.
 
 ## License
 
